@@ -5,21 +5,26 @@ var vm = require('vm');
 var fs = require('fs');
 var path = require('path');
 
-var SDK = "OpenXmlSdkJs-01-01-02";
+var sdkPath = "lib";
 
 function createContext(obj) {
-    for (var key in this) if (this.hasOwnProperty(key)) obj[key] = this[key];
+    for (var key in this) {
+        if (this.hasOwnProperty(key)) {
+            obj[key] = this[key];
+        }
+    }
     return vm.createContext(obj);
 }
 
 var context = createContext({
-  Enumerable: require('linq'),
-  JSZip: require('jszip')
+    Enumerable: require('linq'),
+    JSZip: require('jszip')
 });
+
 ['ltxml.js', 'ltxml-extensions.js', 'openxml.js']
-.forEach(function(name) {
-  vm.runInContext(fs.readFileSync(path.join(path.dirname(module.filename), SDK, name), 'utf8'), context, name);
-});
+    .forEach(function(name) {
+        vm.runInContext(fs.readFileSync(path.join(path.dirname(module.filename), sdkPath, name), 'utf8'), context, name);
+    });
 
 var DOMParser = require('xmldom').DOMParser;
 context.Ltxml.DOMParser = DOMParser;

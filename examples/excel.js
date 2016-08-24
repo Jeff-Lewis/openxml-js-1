@@ -1,13 +1,14 @@
 //
 // Requires
 //
-var sys = require('sys');
-var fs	= require('fs');
-var vm	= require('vm');
+var sys = require('util');
+var fs = require('fs');
+var vm = require('vm');
+var path = require('path');
 
-var Enumerable = require("../index").Enumerable;
-var Ltxml   = require("../index").Ltxml;
-var openXml = require("../index").openXml;
+var Enumerable = require('../index').Enumerable;
+var Ltxml = require('../index').Ltxml;
+var openXml = require('../index').openXml;
 
 //
 // Aliases
@@ -32,39 +33,54 @@ var castInt = Ltxml.castInt;
 var S = openXml.S;
 var R = openXml.R;
 
+var templateFileName = 'sample.xlsx';
+var templateExt = path.extname(templateFileName);
+var templateBasename = path.basename(templateFileName, templateExt);
+
 //
 // Main
 //
 var beginTime = (new Date()).getTime();
-var doc = new openXml.OpenXmlPackage(fs.readFileSync('sample.xlsx'));
+var doc = new openXml.OpenXmlPackage(fs.readFileSync(templateFileName));
 var workbookPart = doc.workbookPart();
 var wbXDoc = workbookPart.getXDocument();
 
 var sharedStringTablePart = workbookPart.sharedStringTablePart();
 var sst = sharedStringTablePart.getXDocument().root;
-var strings = sst.elements(S.si).select(function(si) { 
-    return si.descendants(S.t).aggregate("", function(text, t) { return text += t.value.replace(/\n/g, "\\n"); });
+
+var strings = sst.elements(S.si).select(function(si) {
+    return si.descendants(S.t).aggregate("", function(text, t) {
+        return text += t.value.replace(/\n/g, '\\n');
+    });
 }).toArray();
 
 wbXDoc.root.element(S.sheets).elements(S.sheet).forEach(function(sheet) {
-    console.log(sheet.attribute("name").value);
+    console.log(sheet.attribute('name').value);
 
     var id = sheet.attribute(R.id).value;
     var worksheetPart = workbookPart.getPartById(id);
     var wsXDoc = worksheetPart.getXDocument();
     wsXDoc.descendants(S.row).forEach(function(row) {
         row.descendants(S.c).forEach(function(cell) {
-            console.log("r: "+(cell.attribute("r") != null ? cell.attribute("r").value  : "")
-                        + ", t: "+(cell.attribute("t") != null ? cell.attribute("t").value : "")
-                        + ", v=" + cell.element(S.v).value
-                        + " " + (cell.attribute("t") != null && cell.attribute("t").value == "s" 
-                           ? strings[cell.element(S.v).value] : ""));
+            var msg = '';
+            msg += 'r: ' + (cell.attribute('r') ? cell.attribute('r').value : '');
+            msg += ', t: ' + (cell.attribute('t') ? cell.attribute('t').value : '');
+            msg += ', v=' + (cell.element(S.v) && cell.element(S.v).value);
+            msg += ' ' + (cell.attribute('t') && cell.attribute('t').value == 's' ? strings[cell.element(S.v).value] : '');
+            console.log(msg);
         });
-        console.log("-----");
+        console.log('-----');
     });
 });
+
+var theContent = doc.saveToBase64();
+var buffer = new Buffer(theContent, 'base64');
+
+var fileName = templateBasename + '_processed' + templateExt;
+fs.writeFileSync(fileName, buffer);
+
 
 var endTime = (new Date()).getTime();
 var deltaTime = endTime - beginTime;
 
-console.log("Finished writing a document in " + (deltaTime / 1000).toString() + " seconds.");
+console.log('Finished writing a document in ' + (deltaTime / 1000).toString() + ' seconds.');
